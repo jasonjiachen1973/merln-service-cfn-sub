@@ -1,6 +1,6 @@
 {
   "Parameters" : {
-    "StackName" : "merlnProdNWStack",
+    "StackName" : "Prod-merln-cfn-nw",
     "ServiceName" : "merln-backend-prod",
     "ImageUrl" : "050752619675.dkr.ecr.ca-central-1.amazonaws.com/merln-backend-prod",
     "ContainerPort" : "9000",

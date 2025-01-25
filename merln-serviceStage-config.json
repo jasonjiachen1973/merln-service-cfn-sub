@@ -1,6 +1,6 @@
 {
   "Parameters" : {
-    "StackName" : "merlnStagingNWStack",
+    "StackName" : "Stage-merln-cfn-nw",
     "ServiceName" : "merln-staging-backend",
     "ImageUrl" : "050752619675.dkr.ecr.ca-central-1.amazonaws.com/merln-staging-backend",
     "ContainerPort" : "9000",
