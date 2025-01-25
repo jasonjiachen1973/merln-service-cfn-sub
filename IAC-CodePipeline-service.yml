@@ -267,8 +267,8 @@ Resources:
                 RoleArn: !GetAtt [ CloudFormationRole, Arn ]
                 Capabilities: CAPABILITY_NAMED_IAM
                 StackName: !Sub Stage-${AWS::StackName}
-                TemplateConfiguration: CFNCodeBuildOutput::merln-networkStage-config.json               
-                TemplatePath: CFNCodeBuildOutput::merln-network-Stack-pipeline.yml
+                TemplateConfiguration: CFNCodeBuildOutput::merln-serviceStage-config.json               
+                TemplatePath: CFNCodeBuildOutput::merln-Service-Stack-pipeline.yml
               RunOrder: 1
         - Name: Production
           Actions:
@@ -288,8 +288,8 @@ Resources:
                 RoleArn: !GetAtt [ CloudFormationRole, Arn ]
                 Capabilities: CAPABILITY_NAMED_IAM
                 StackName: !Sub Prod-${AWS::StackName}
-                TemplateConfiguration: CFNCodeBuildOutput::merln-networkProd-config.json                
-                TemplatePath: CFNCodeBuildOutput::merln-network-Stack-pipeline.yml
+                TemplateConfiguration: CFNCodeBuildOutput::merln-serviceProd-config.json                
+                TemplatePath: CFNCodeBuildOutput::merln-Service-Stack-pipeline.yml
               RunOrder: 1
             - Name: ProdApproval
               ActionTypeId:
