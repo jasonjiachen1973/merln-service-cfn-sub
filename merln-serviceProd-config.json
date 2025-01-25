@@ -2,7 +2,7 @@
   "Parameters" : {
     "StackName" : "merlnProdNWStack",
     "ServiceName" : "merln-backend-prod",
-    "ImageUrl" : "829744991112.dkr.ecr.ca-central-1.amazonaws.com/merln-backend-prod",
+    "ImageUrl" : "050752619675.dkr.ecr.ca-central-1.amazonaws.com/merln-backend-prod",
     "ContainerPort" : "9000",
     "ContainerCpu" : "2048",
     "ContainerMemory" : "4096",
