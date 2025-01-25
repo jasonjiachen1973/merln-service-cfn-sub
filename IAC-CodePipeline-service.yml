@@ -5,7 +5,7 @@ Parameters:
   CFNTemplateRepoName:
     Type: String
     Description: Name of the repo which contains CFN template.
-    Default: merln-nw-cfn-pipe
+    Default: merln-service-cfn-pipe
   ArtifactStoreS3Location:
     Type: String
     Description: Name of the S3 bucket to store CodePipeline artificat.
