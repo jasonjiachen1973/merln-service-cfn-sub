@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy a service on AWS Fargate, hosted in a public subnet of a VPC, and accessible via a public load balancer
+
+# Input Paramters
+Parameters:
+  StackName: 
+    Type: String
+#   Default: Fargate-Network-Stack
+    Description: The name of the parent fargate networking stack
+  ServiceName:
+    Type: String
+#   Default: nginx
+    Description: Name of the ECS service
+  ImageUrl:
+    Type: String
+#   Default: nginx
+    Description: The url of a docker image that contains the application process that
+                 will handle the traffic for this service
+  ContainerPort:
+    Type: Number
+#   Default: 80
+    Description: What port number the application inside the docker container is binding to
+  ContainerCpu:
+    Type: Number
+#   Default: 256
+    Description: How much CPU to give the container. 1024 is 1 CPU
+  ContainerMemory:
+    Type: Number
+    Default: 512
+    Description: How much memory in megabytes to give the container
+  Path:
+    Type: String
+#   Default: "*"
+    Description: A path on the public load balancer that this service
+                 should be connected to. Use * to send all load balancer
+                 traffic to this service.
+  Priority:
+    Type: Number
+#   Default: 1
+    Description: The priority for the routing rule added to the load balancer.
+                 This only applies if your have multiple services which have been
+                 assigned to different paths on the load balancer.
+  DesiredCount:
+    Type: Number
+#   Default: 2
+    Description: How many copies of the service task to run
+  Role:
+    Type: String
+#   Default: ""
+    Description: (Optional) An IAM role to give the service's containers if the code within needs to
+                 access other AWS resources like S3 buckets, DynamoDB tables, etc
+  LoggroupPath:
+    Type: String
+#   Default: "/ecs/merln-backend-django-pipeline"
+    Description: A path for awslogs-group of TaskDefinition/ContainerDefinitions/LogConfiguration/Options
+  MaxCapacity:
+    Type: Number
+#   Default: 3
+    Description: The maximum value that you plan to scale out to
+  MinCapacity:
+    Type: Number
+#   Default: 1
+    Description: The minimum value that you plan to scale in to
+  TargetValue:
+    Type: Number
+#   Default: 70
+    Description: The target value for the metric if the metric is CPU utilization, then the value is a percent value     
+
+Conditions: 
+  HasCustomRole: !Not [!Equals [!Ref 'Role', '']]                 
+
+# Task Definition  
+Resources: 
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition 
+    Properties: 
+      Family: !Ref 'ServiceName'
+      Cpu: !Ref 'ContainerCpu'
+      Memory: !Ref 'ContainerMemory'
+      NetworkMode: awsvpc
+      RequiresCompatibilities: 
+        - FARGATE 
+      ExecutionRoleArn:
+        Fn::ImportValue: 
+          !Join [':', [!Ref 'StackName', 'ECSTaskExecutionRole']]  
+      TaskRoleArn:
+        Fn::ImportValue:
+        # give container the permission to create aswlogs-group
+          !Join [':', [!Ref 'StackName', 'ECSTaskExecutionRole']] 
+      #  Fn::If: 
+      #    - 'HasCustomRole' 
+      #    - !Ref 'Role'
+      #    - !Ref "AWS::NoValue"         
+      ContainerDefinitions:
+        - Name: !Ref 'ServiceName'
+          Cpu: !Ref 'ContainerCpu'
+          Memory: !Ref 'ContainerMemory'
+          Image: !Ref 'ImageUrl'
+          PortMappings: 
+            - ContainerPort: !Ref 'ContainerPort' 
+          LogConfiguration:   
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref 'LoggroupPath'
+              awslogs-region: ca-central-1
+              awslogs-stream-prefix: ecs
+              awslogs-create-group: true
+
+# ALB Target Group
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup 
+    Properties: 
+      HealthCheckIntervalSeconds: 6
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP 
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      TargetType: ip 
+      Name: !Ref 'StackName'
+      Port: !Ref 'ContainerPort'
+      Protocol: HTTP 
+      UnhealthyThresholdCount: 2
+      VpcId:                     
+        Fn::ImportValue:
+          !Join [':', [!Ref 'StackName', 'VPCId']]
+
+# ALB Rule
+  LoadBalancerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - TargetGroupArn: !Ref 'TargetGroup'       
+          Type: 'forward'
+      Conditions:
+        - Field: host-header
+          Values: [!Ref 'Path']       
+      ListenerArn: 
+        Fn::ImportValue:
+          !Join [':', [!Ref 'StackName', 'PublicListenerHTTPS']] 
+      Priority: !Ref 'Priority'                         
+
+# ECS or Fargate Service     
+  Service: 
+    Type: AWS::ECS::Service 
+    DependsOn: LoadBalancerRule 
+    Properties: 
+      ServiceName: !Ref 'ServiceName'
+      Cluster: 
+        Fn::ImportValue: 
+          !Join [':', [!Ref 'StackName', 'ClusterName']] 
+      LaunchType: FARGATE 
+      DeploymentConfiguration: 
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true 
+        MaximumPercent: 200
+        MinimumHealthyPercent: 75
+      DesiredCount: !Ref 'DesiredCount'    
+      # for access a container on AWS Fargate
+      EnableExecuteCommand: True
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups: 
+            - Fn::ImportValue:
+                !Join [':', [!Ref 'StackName', 'FargateContainerSecurityGroup']]    
+          Subnets:
+            - Fn::ImportValue:
+                !Join [':', [!Ref 'StackName', 'PublicSubnetOne']]                          
+            - Fn::ImportValue:
+                !Join [':', [!Ref 'StackName', 'PublicSubnetTwo']]    
+      TaskDefinition:  !Ref TaskDefinition
+      HealthCheckGracePeriodSeconds: 600
+      LoadBalancers:
+        - ContainerName: !Ref 'ServiceName'
+          ContainerPort: !Ref 'ContainerPort'
+          TargetGroupArn: !Ref 'TargetGroup'       
+
+
+  # ECS Service AutoScaling                
+
+  ECSServiceAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [application-autoscaling.amazonaws.com]
+          Action: ["sts:AssumeRole"]
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'     
+
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: !Ref 'MaxCapacity'
+      MinCapacity: !Ref 'MinCapacity'
+      ResourceId: !Join
+        - "/"
+        - - 'service'
+          - Fn::ImportValue:
+              !Join [':', [!Ref 'StackName', 'ClusterName']]
+          - !GetAtt Service.Name
+
+      RoleARN: !GetAtt ECSServiceAutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs          
+
+  AutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: ServiceAutoScalingPolicy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+          #PredefinedMetricType: ECSServiceAverageMemoryUtilization
+        ScaleInCooldown: 10
+        ScaleOutCooldown: 10
+        TargetValue: !Ref 'TargetValue'     
+
+     

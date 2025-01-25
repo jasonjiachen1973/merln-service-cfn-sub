@@ -1,0 +1,19 @@
+{
+  "Parameters" : {
+    "StackName" : "merlnProdNWStack",
+    "ServiceName" : "merln-backend-prod",
+    "ImageUrl" : "829744991112.dkr.ecr.ca-central-1.amazonaws.com/merln-backend-prod",
+    "ContainerPort" : "9000",
+    "ContainerCpu" : "2048",
+    "ContainerMemory" : "4096",
+    "Path" : "*.merln.com",
+    "Priority" : "1",
+    "DesiredCount" : "2",
+    "Role" : "",
+    "LoggroupPath" : "/ecs/merlnProd",
+    "MaxCapacity" : "5",
+    "MinCapacity" : "2",
+    "TargetValue" : "60"
+  }
+}
+
